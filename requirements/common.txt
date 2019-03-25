@@ -1,0 +1,10 @@
+celery
+django
+django-tastypie
+django-redis
+django-environ
+gunicorn
+psycopg2
+redis
+requests
+requests_oauthlib

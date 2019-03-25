@@ -1,0 +1,24 @@
+db:
+  image: postgres
+redis:
+  image: redis
+  hostname: redis
+web:
+  build: .
+  command: bash -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+  volumes:
+    - .:/code
+  ports:
+    - "8000:8000"
+  env_file: .env
+  links:
+    - db
+    - redis
+worker:
+  build: .
+  command: celery worker -A invtask.app.celery --loglevel=info --logfile=worker.log -B
+  volumes:
+    - .:/code
+  links:
+    - db
+    - redis

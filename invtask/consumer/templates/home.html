@@ -1,0 +1,275 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="inv-hero">
+  <h1>Twitter Profiles</h1>
+  <p class="lead">Minimal REST API Consumer</p>
+</div>
+
+<div id="inv-app">
+   <button class="pull-right btn btn-lg btn-default" @click="refreshAll">
+   <span class="glyphicon glyphicon-refresh"></span>
+ </button>
+
+ <div class="inv-entry">
+   <input class="new-profile"
+     v-bind:class="{ shake: shake }"
+     autofocus autocomplete="off"
+     placeholder="@username"
+     v-model="newProfile"
+     v-on:keyup.13="append">
+ </div>
+
+  <ul class="profiles">
+		<profile-card
+      v-for="item in profiles"
+      v-bind:countdown="countdown"
+      v-bind:profile="item"
+      v-bind:key="item.id">
+    </profile-card>
+	</ul>
+</div>
+
+{% verbatim %}
+<template id="profile-template">
+  <transition name="bounce">
+  <li class="inv-card" v-bind:class="{ new: profile.isNew }">
+      <div class="media">
+          <div class="media-left">
+            <h1 class="media-popularity">{{ profile.popularity }}</h1>
+          </div>
+          <div class="media-left">
+            <img class="media-object img-circle profile-img" :src="profile.profile_image_url">
+          </div>
+          <div class="media-body">
+            <h2 class="media-heading">{{ profile.name }} <small>| Followers: {{ profile.followers_count }} | Following {{ profile.friends_count }}</small></h2>
+            <div class="username">@{{ profile.screen_name }}</div>
+            <div class="description">{{ profile.description }}</div>
+          </div>
+          <div class="media-right">
+            <span class="label label-default">{{ profile.status }}</span>
+            <div class="countdown" v-if="profile.countdown">:{{profile.countdown}}</div>
+          </div>
+      </div>
+  </li>
+  </transition>
+</template>
+{% endverbatim %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
++function(window) {
+  'use strict';
+
+Vue.component('profile-card', {
+  props: ['profile'],
+  template: '#profile-template'
+})
+
+new Vue({
+    el: '#inv-app',
+    data: {
+       shake: false,
+       hasNews: false,
+       path: "/api/v1/profile/",
+       countdown: 10,
+       newProfile: '',
+       profiles: []
+    },
+    created: function () {
+      /* Get current profiles. Initialize timer to calculate countdowns */
+      this.refreshAll();
+   		var vm = this
+      setInterval(function() {
+        if (!vm.hasNews) {
+          return;
+        }
+        vm.hasNews = false;
+        for (var i = 0; i < vm.profiles.length; i++) {
+          var profile = vm.profiles[i];
+          if (profile.isNew) {
+            vm.hasNews = true;
+            profile.countdown --;
+            if (profile.countdown === 0) {
+              profile.countdown = vm.countdown;
+              vm.refreshProfile(profile.screen_name);
+            }
+          }
+        }
+      }, 1000)
+    },
+    methods: {
+      append: function (event) {
+        /* Creates a new profile or get an existing one */
+        var value = this.newProfile && this.newProfile.trim()
+
+        if (!value) {
+          return
+        }
+
+        if (/^(\w{3,})$/.test(value)) {
+          // TODO: Check if profile already exists.
+
+          var vm = this;
+
+          this.$http.get(this.path + this.newProfile).then(function(data) {
+            vm.hasNews = true;
+            vm.profiles.unshift({
+              isNew: true,
+              countdown: vm.countdown,
+              id: vm.profiles.length,
+              screen_name: value,
+              name: 'Processing ...',
+              status: 'In Progress',
+              profile_image_url: 'http://abs.twimg.com/sticky/default_profile_images/default_profile_normal.png',
+              popularity: '?',
+            })
+
+          });
+          this.shake = false;
+          this.newProfile = ''
+        }
+        else {
+          this.shake = true;
+        }
+
+      },
+      refreshProfile: function(screen_name) {
+        /* Calls REST api to get a single profiles. */
+        var vm = this;
+        this.$http.get(this.path + screen_name).then(function(data) {
+          if (data.body.status !== "Complete") {
+            return;
+          }
+
+          for (var i = 0; i < vm.profiles.length; i++) {
+            var profile = vm.profiles[i];
+            if (profile.screen_name === screen_name  ) {
+              vm.profiles.splice(i, 1); // Remove old
+              vm.profiles.splice(parseInt(data.body.popularity)-1, 0, data.body); // Add new
+            }
+          }
+
+        });
+      },
+      refreshAll: function (event) {
+        /* Calls REST api to get all stored profiles. */
+        this.$http.get(this.path).then(function(data) {
+          this.profiles = data.body.objects
+        });
+      }
+    }
+})
+
+}(window)
+</script>
+{% endblock scripts %}
+
+{% block styles %}
+<style media="screen">
+body {
+  padding-top: 50px;
+}
+.inv-hero {
+  padding: 40px 0 10px;
+  text-align: center;
+}
+#inv-app {
+  margin: 0 0 40px ;
+}
+.inv-entry {
+  text-align: center;
+  margin-bottom: 20px;
+}
+.inv-entry input {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.4em;
+  padding: 6px;
+  box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+.inv-entry input.shake {
+  animation: shake 0.82s cubic-bezier(.36,.07,.19,.97) both;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+  outline-color: red;
+}
+
+ul.profiles {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.inv-card {
+  border: 1px solid #cccccc;
+  background: #f8f8f8;
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  font-size: 12px;
+}
+.inv-card.new {
+  opacity: 0.5;
+}
+.countdown {
+  text-align: center;
+  font-size: 16px;
+  font-weight: bold;
+  margin-top: 4px;
+  color: blue;
+}
+.profile-img {
+  height: 45px;
+  background: white;
+}
+.media-popularity {
+  margin: 0;
+  font-weight: normal;
+  min-width: 80px;
+  text-align: center;
+}
+.media-heading {
+  font-size: 16px;
+}
+
+.bounce-enter-active {
+  animation: bounce-in .5s;
+}
+.bounce-leave-active {
+  animation: bounce-in .5s reverse;
+}
+/* ANIMATIONS */
+
+@keyframes bounce-in {
+  0% {
+    transform: translateX(800px);
+  }
+  100% {
+    transform: translate(0px);
+  }
+}
+
+@keyframes shake {
+  10%, 90% {
+    transform: translate3d(-4px, 0, 0);
+  }
+
+  20%, 80% {
+    transform: translate3d(5px, 0, 0);
+  }
+
+  30%, 50%, 70% {
+    transform: translate3d(-7px, 0, 0);
+  }
+
+  40%, 60% {
+    transform: translate3d(7px, 0, 0);
+  }
+}
+</style>
+{% endblock styles %}

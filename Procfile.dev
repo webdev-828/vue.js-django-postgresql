@@ -1,0 +1,6 @@
+redis: redis-server
+pg: postgres -D tmp/postgres -p 5433
+worker: celery worker -A invtask.app.celery --loglevel=info --logfile=worker.log -B
+flower: celery flower -A invtask.app.celery --address=127.0.0.1 --port=5555
+web: python manage.py runserver_plus
+# web: gunicorn invtask.wsgi
